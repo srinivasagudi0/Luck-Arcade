@@ -1,6 +1,6 @@
 # Luck Arcade
 
-Command-line and Streamlit UI bundle of mini-games: Dice Roll, Coin Flip, and Rock Paper Scissors.
+Command-line and Streamlit UI bundle of mini-games: Dice Roll, Coin Flip, Rock Paper Scissors — plus new space-themed arcade rounds.
 
 ## Requirements
 - Python 3.10+
@@ -9,6 +9,8 @@ Command-line and Streamlit UI bundle of mini-games: Dice Roll, Coin Flip, and Ro
 - Dice Roll: predict a number 1-6 and roll to match.
 - Coin Flip: call Heads or Tails and flip (tracks attempts + win streak).
 - Rock Paper Scissors: best of 3 (first to 2 wins; ties don’t count).
+- Meteor Dodge (UI): choose a lane and avoid an incoming meteor.
+- Planet Guess (UI): pick an orbit (1–8) to locate the hidden world.
 
 ## Run (Streamlit UI)
 ```bash
@@ -38,6 +40,7 @@ luck-arcade
 - `app.py`: Streamlit UI for all games.
 - `main.py`: CLI menu and game selection.
 - `dice_roll.py`, `coin_flip.py`, `rock_paper_scissors.py`: game logic.
+- `app.py` includes space-themed UI styling and extra UI-only games.
 - `cli_utils.py`: shared CLI input helpers.
 - `README.md`: This documentation file.
 
