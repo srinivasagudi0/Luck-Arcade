@@ -1,0 +1,2 @@
+[console_scripts]
+luck-arcade = main:run_cli
