@@ -1,12 +1,12 @@
 # TODO
 
 ## Code Cleanup
-- [x] Extract shared CLI input helpers (yes/no, quit handling) to avoid duplication.
-- [x] Remove `heads_or_tails.py` (duplicate game; not in the menu).
+- [x] Pull shared CLI input logic into `cli_utils.py`.
+- [x] Remove old duplicate `heads_or_tails.py`.
 
 ## Testing
-- [ ] Add a short manual test checklist (menu flow, quit flow, invalid input).
-- [x] Add basic automated tests using `unittest` (includes mocked input).
+- [ ] Add a short manual checklist (menu, quitting, bad input).
+- [x] Keep basic `unittest` coverage in place.
 
 ## CI
-- [x] Add GitHub Actions workflow to compile + run tests.
+- [x] Keep GitHub Actions running compile + tests.

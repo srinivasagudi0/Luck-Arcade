@@ -26,10 +26,10 @@ def rps_round_result(user_choice: str, comp_choice: str) -> str:
 
 
 def game_rock_paper_scissors():
-    """Play a best-of-3 rock-paper-scissors match against the computer."""
-    print("Rock, Paper, Scissors Game!")
+    """Run a best-of-3 rock-paper-scissors match."""
+    print("Rock, Paper, Scissors.")
     print()
-    print("Best of 3: first to 2 wins (ties don't count).")
+    print("Best of 3. First to 2 wins. Ties do not count.")
 
     while True:
         user_wins = 0
@@ -42,12 +42,12 @@ def game_rock_paper_scissors():
                 empty_message="Please enter Rock, Paper, or Scissors.",
             )
             if user_input is None:
-                print("Thanks for playing Rock, Paper, Scissors!")
+                print("Leaving Rock, Paper, Scissors.")
                 return
 
             user_choice = normalize_rps_choice(user_input)
             if user_choice is None:
-                print("Invalid input. Please enter Rock, Paper, or Scissors.")
+                print("Pick rock, paper, or scissors.")
                 continue
 
             comp_choice = rd.choice(CHOICES)
@@ -57,27 +57,27 @@ def game_rock_paper_scissors():
             print(f"Computer chose: {comp_choice}")
 
             if result == "tie":
-                print("It's a tie!")
+                print("Tie round.")
             elif result == "win":
                 user_wins += 1
-                print("You win this round! Congratulations!")
+                print("You take this round.")
             else:
                 comp_wins += 1
-                print("You lose this round. Better luck next time!")
+                print("Computer takes this round.")
 
             print(f"Score — You: {user_wins} | Computer: {comp_wins}")
             print()
 
         if user_wins > comp_wins:
-            print("You are the overall winner of the best of 3!")
+            print("You won the match.")
         else:
-            print("The computer wins the best of 3.")
+            print("Computer won the match.")
 
         again = prompt_yes_no("Play another best-of-3 match? (y/n): ", allow_quit=True)
         if again is True:
             print()
             continue
-        print("Thank you for playing Rock, Paper, Scissors!")
+        print("Done with Rock, Paper, Scissors.")
         return
 
-# end of rock_paper_scissors.py
+# rock_paper_scissors.py

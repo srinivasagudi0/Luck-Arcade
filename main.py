@@ -4,85 +4,55 @@ from rock_paper_scissors import game_rock_paper_scissors as rps
 from cli_utils import prompt_nonempty, prompt_yes_no
 
 
-
-def greeting_message():
-    print('Thanks for using Luck Arcade!')
-    greeting = (
-        "Welcome to Luck Arcade!\n"
-        "Here, you can try your luck with various games and win exciting prizes.\n"
-        "Choose a game to get started, and may the odds be in your favor!\n"
-    )
-
-    menu = (
-        "Please select a game:\n"
-        "  1. Dice Roll (Nightmare)\n"
-        "  2. Coin Flip (Medium)\n"
-        "  3. Rock Paper Scissors (Hard)"
-    )
-
-
-
-    print(greeting)
-    print(menu)
-
-
-def instructions(choice):
-    if choice == 1:
-        print('You predict a dice roll. Roll a die and try to match your number!')
-    elif choice == 2:
-        print('You predict a coin flip. Flip a coin and try to match the side!')
-    elif choice == 3:
-        print('You predict Rock, Paper, or Scissors. Play against the computer and try to win!')
-    else:
-        print('Invalid choice. Please select a valid game number.')
-
-
 def run_cli():
-    greeting_message()
+    print("Welcome to Luck Arcade!")
+    print("Nothing fancy here, just quick luck-based games.")
+
     while True:
-        selection = prompt_nonempty(
+        print("\nPick a game:")
+        print("  1. Dice Roll (Nightmare)")
+        print("  2. Coin Flip (Medium)")
+        print("  3. Rock Paper Scissors (Hard)")
+
+        raw = prompt_nonempty(
             '\nEnter a game number (1-3) or "quit"/"exit"/"q" to exit: ',
             allow_quit=True,
             empty_message="Please enter a choice.",
         )
-        if selection is None:
+        if raw is None:
             print("Goodbye!")
             return
-        if selection.lower() in ('help', 'h', '?'):
-            help = """
-            To play a game, enter the corresponding number (1-3).
-            To exit the program at any time, type 'quit', 'exit', or 'q'.
-            Enjoy your time at Luck Arcade!
-            """
-            print(help)
+
+        if raw.lower() in ("help", "h", "?"):
+            print("\nType 1, 2, or 3 to play.")
+            print("Use quit/exit/q any time if you want to leave.")
             continue
 
         try:
-            choice = int(selection)
+            choice = int(raw)
         except ValueError:
-            print('Invalid input. Enter a number between 1 and 3, or "quit" to exit.')
-            continue
-        if choice not in (1, 2, 3):
-            print('Please select a valid game number (1-3).')
+            print("That is not a number. Try again with 1, 2, or 3.")
             continue
 
-        instructions(choice)
         if choice == 1:
+            print("\nDice Roll: guess a number and keep rolling until it matches.")
             dr()
         elif choice == 2:
+            print("\nCoin Flip: call heads or tails and test your luck.")
             cf()
         elif choice == 3:
+            print("\nRock Paper Scissors: beat the computer in a best-of-3.")
             rps()
+        else:
+            print("Only 1, 2, or 3 works here.")
+            continue
 
         again = prompt_yes_no('\nReturn to main menu? (y/n): ', allow_quit=True)
         if again is True:
             continue
-        print('Thanks for playing! Goodbye.')
+        print("Thanks for playing! Goodbye.")
         return
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_cli()
-
-#end of main.py
-# Did most of the updates in main.py to integate the games together.

@@ -6,7 +6,7 @@ from rock_paper_scissors import normalize_rps_choice, rps_round_result
 
 class TestCoinFlip(unittest.TestCase):
     def test_normalize_choice(self):
-        cases = {
+        samples = {
             "h": "Heads",
             "Heads": "Heads",
             " heads ": "Heads",
@@ -16,14 +16,14 @@ class TestCoinFlip(unittest.TestCase):
             "x": None,
             "": None,
         }
-        for text, expected in cases.items():
+        for text, expected in samples.items():
             with self.subTest(text=text):
                 self.assertEqual(normalize_coin_choice(text), expected)
 
 
 class TestRockPaperScissors(unittest.TestCase):
     def test_normalize_rps_choice(self):
-        cases = {
+        samples = {
             "r": "Rock",
             "rock": "Rock",
             "p": "Paper",
@@ -33,7 +33,7 @@ class TestRockPaperScissors(unittest.TestCase):
             "x": None,
             "": None,
         }
-        for text, expected in cases.items():
+        for text, expected in samples.items():
             with self.subTest(text=text):
                 self.assertEqual(normalize_rps_choice(text), expected)
 
@@ -43,4 +43,3 @@ class TestRockPaperScissors(unittest.TestCase):
         self.assertEqual(rps_round_result("Rock", "Paper"), "loss")
         self.assertEqual(rps_round_result("Paper", "Rock"), "win")
         self.assertEqual(rps_round_result("Scissors", "Paper"), "win")
-

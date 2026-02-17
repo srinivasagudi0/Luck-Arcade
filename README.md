@@ -1,16 +1,17 @@
 # Luck Arcade
 
-Command-line and Streamlit UI bundle of mini-games: Dice Roll, Coin Flip, Rock Paper Scissors — plus new space-themed arcade rounds.
+Small arcade project with a CLI and a Streamlit UI.
+It has Dice Roll, Coin Flip, Rock Paper Scissors, plus two space mini-games.
 
 ## Requirements
 - Python 3.10+
 
 ## Games
-- Dice Roll: predict a number 1-6 and roll to match.
-- Coin Flip: call Heads or Tails and flip (tracks attempts + win streak).
-- Rock Paper Scissors: best of 3 (first to 2 wins; ties don’t count).
-- Meteor Dodge (UI): choose a lane and avoid an incoming meteor.
-- Planet Guess (UI): pick an orbit (1–8) to locate the hidden world.
+- Dice Roll: pick a number from 1-6 and try to hit it.
+- Coin Flip: call heads/tails and see if it lands your way.
+- Rock Paper Scissors: best of 3 against the computer.
+- Meteor Dodge (UI): choose a lane and avoid a meteor.
+- Planet Guess (UI): guess the orbit from 1 to 8.
 
 ## Run (Streamlit UI)
 ```bash
@@ -23,7 +24,7 @@ streamlit run app.py
 ```bash
 python3 main.py
 ```
-Choose 1–3 or type `quit`/`exit`/`q` to leave.
+Choose 1-3, or type `quit` / `exit` / `q` to leave.
 
 ### Optional: install as a CLI command
 ```bash
@@ -32,9 +33,9 @@ luck-arcade
 ```
 
 ## Notes
-- Standard library + Streamlit only.
-- Input is case-insensitive for menu selections and in-game prompts.
-- Basic error handling for invalid inputs.
+- Very small dependency list.
+- Inputs are case-insensitive in the CLI.
+- Invalid input is handled with simple retry prompts.
 
 ## Files
 - `app.py`: Streamlit UI for all games.
@@ -48,5 +49,4 @@ luck-arcade
 MIT (see `LICENSE`).
 
 ---
-Enjoy playing and testing your luck!
-Peace! ✌️
+Have fun and good luck.

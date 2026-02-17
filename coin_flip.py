@@ -15,13 +15,13 @@ def _normalize_choice(text: str) -> str | None:
 
 
 def continuous_game_coin_flip():
-    """Coin-flip game with session stats (attempts + winning streak)."""
+    """Coin flip loop with simple session tracking."""
     attempts = 0
     streak = 0
 
-    print("Welcome to the Coin Flip Game!")
+    print("Coin Flip time.")
     print()
-    print("Predict the outcome of a coin flip: Heads or Tails.")
+    print("Call it: Heads or Tails.")
 
     while True:
         user_input = prompt_nonempty(
@@ -30,35 +30,35 @@ def continuous_game_coin_flip():
             empty_message="Please enter Heads or Tails.",
         )
         if user_input is None:
-            print("See you next time!")
+            print("Leaving coin flip. See you later.")
             return
 
         user_choice = _normalize_choice(user_input)
         if user_choice is None:
-            print("Invalid input. Please enter Heads or Tails.")
+            print("Hmm, that was not heads or tails.")
             continue
 
         attempts += 1
-        coin_flip = rd.choice(["Heads", "Tails"])
+        coin_result = rd.choice(["Heads", "Tails"])
         print()
-        print("The coin landed on:", coin_flip)
+        print("Coin says:", coin_result)
 
-        if coin_flip == user_choice:
+        if coin_result == user_choice:
             streak += 1
-            print("You won! Congratulations! :)")
+            print("Nice call, you got it.")
         else:
             streak = 0
-            print("It was not your luck this time. :(")
+            print("Nope, not this one.")
 
         print(f"Attempts this session: {attempts}")
         print(f"Current winning streak: {streak}")
 
-        again = prompt_yes_no("Play again? (y/n): ", allow_quit=True)
+        again = prompt_yes_no("Flip again? (y/n): ", allow_quit=True)
         if again is True:
             print()
             continue
-        print("Thank you for playing the Coin Flip Game!")
+        print("Done with coin flip for now.")
         return
 
 
-# End of coin_flip.py
+# coin_flip.py

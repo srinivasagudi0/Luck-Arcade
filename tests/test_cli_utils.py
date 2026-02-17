@@ -6,7 +6,7 @@ from cli_utils import is_quit, prompt_nonempty, prompt_yes_no
 
 class TestIsQuit(unittest.TestCase):
     def test_is_quit_true(self):
-        for text in ("q", "quit", "exit", " Q ", "Quit", "EXIT"):
+        for text in ("q", "quit", "exit", " Q ", "Quit", "EXIT"):  # mixed casing/spaces
             with self.subTest(text=text):
                 self.assertTrue(is_quit(text))
 

@@ -2,5 +2,6 @@ app
 cli_utils
 coin_flip
 dice_roll
+docx_editor
 main
 rock_paper_scissors

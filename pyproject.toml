@@ -5,11 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "luck-arcade"
 version = "0.1.0"
-description = "Command-line and Streamlit UI bundle of mini-games."
+description = "Small arcade project with CLI + Streamlit mini-games."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "Srinivas Agudi" }]
+dependencies = [
+  "python-docx>=1.1.0",
+]
 
 [project.optional-dependencies]
 ui = ["streamlit>=1.30.0"]
@@ -23,6 +26,7 @@ py-modules = [
   "cli_utils",
   "coin_flip",
   "dice_roll",
+  "docx_editor",
   "main",
   "rock_paper_scissors",
 ]

@@ -39,7 +39,7 @@ def prompt_yes_no(prompt: str, *, allow_quit: bool = False) -> bool | None:
             return None
         value = raw.strip()
         if not value:
-            print("Please enter yes or no.")
+            print("Please type yes or no.")
             continue
         if allow_quit and is_quit(value):
             return None
@@ -47,4 +47,4 @@ def prompt_yes_no(prompt: str, *, allow_quit: bool = False) -> bool | None:
             return True
         if value.lower().startswith("n"):
             return False
-        print("Please enter yes or no.")
+        print("Please type yes or no.")

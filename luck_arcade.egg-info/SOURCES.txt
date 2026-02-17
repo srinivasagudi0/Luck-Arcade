@@ -4,6 +4,7 @@ app.py
 cli_utils.py
 coin_flip.py
 dice_roll.py
+docx_editor.py
 main.py
 pyproject.toml
 rock_paper_scissors.py
@@ -14,4 +15,5 @@ luck_arcade.egg-info/entry_points.txt
 luck_arcade.egg-info/requires.txt
 luck_arcade.egg-info/top_level.txt
 tests/test_cli_utils.py
+tests/test_docx_editor.py
 tests/test_games.py
