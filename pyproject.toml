@@ -29,4 +29,5 @@ py-modules = [
   "docx_editor",
   "main",
   "rock_paper_scissors",
+  "number_guess"
 ]

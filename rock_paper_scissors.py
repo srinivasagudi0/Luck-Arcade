@@ -1,6 +1,7 @@
 import random as rd
 
-from cli_utils import prompt_nonempty, prompt_yes_no
+from cli_utils import prompt_nonempty, prompt_yes_no, run_global_command
+from stats import update_and_persist_stats
 
 CHOICES = ("Rock", "Paper", "Scissors")
 _BEATS = {"Rock": "Scissors", "Paper": "Rock", "Scissors": "Paper"}
@@ -30,6 +31,7 @@ def game_rock_paper_scissors():
     print("Rock, Paper, Scissors.")
     print()
     print("Best of 3. First to 2 wins. Ties do not count.")
+    print("Commands: help, stats, menu, quit")
 
     while True:
         user_wins = 0
@@ -44,6 +46,21 @@ def game_rock_paper_scissors():
             if user_input is None:
                 print("Leaving Rock, Paper, Scissors.")
                 return
+
+            signal = run_global_command(
+                user_input,
+                context="game",
+                on_help=lambda: print("Type rock/paper/scissors (or r/p/s)."),
+                on_stats=lambda: print(f"Current score: You {user_wins} | Computer {comp_wins}"),
+            )
+            if signal == "quit":
+                print("Leaving Rock, Paper, Scissors.")
+                return
+            if signal == "menu":
+                print("Returning to main menu.")
+                return
+            if signal == "handled":
+                continue
 
             user_choice = normalize_rps_choice(user_input)
             if user_choice is None:
@@ -69,8 +86,10 @@ def game_rock_paper_scissors():
             print()
 
         if user_wins > comp_wins:
+            update_and_persist_stats("rps", "win")
             print("You won the match.")
         else:
+            update_and_persist_stats("rps", "loss")
             print("Computer won the match.")
 
         again = prompt_yes_no("Play another best-of-3 match? (y/n): ", allow_quit=True)

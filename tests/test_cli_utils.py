@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from cli_utils import is_quit, prompt_nonempty, prompt_yes_no
+from cli_utils import handle_global_command, is_quit, prompt_nonempty, prompt_yes_no, run_global_command
 
 
 class TestIsQuit(unittest.TestCase):
@@ -46,3 +46,42 @@ class TestPromptHelpers(unittest.TestCase):
         with patch("builtins.input", side_effect=["q"]):
             value = prompt_yes_no("Prompt: ", allow_quit=True)
         self.assertIsNone(value)
+
+
+class TestGlobalCommands(unittest.TestCase):
+    def test_handle_global_command(self):
+        samples = {
+            "quit": "quit",
+            "Q": "quit",
+            "help": "help",
+            "?": "help",
+            "stats": "stats",
+            "scores": "stats",
+            "menu": "menu",
+            "back": "menu",
+            "abc": None,
+            "": None,
+        }
+        for text, expected in samples.items():
+            with self.subTest(text=text):
+                self.assertEqual(handle_global_command(text, "game"), expected)
+
+    def test_handle_global_command_suppresses_menu_inside_main_menu(self):
+        self.assertIsNone(handle_global_command("menu", "main_menu"))
+
+    def test_run_global_command(self):
+        self.assertEqual(run_global_command("quit", context="game"), "quit")
+        self.assertEqual(run_global_command("menu", context="game"), "menu")
+        self.assertEqual(run_global_command("x", context="game"), None)
+
+    def test_run_global_command_help_and_stats(self):
+        seen = []
+        self.assertEqual(
+            run_global_command("help", context="game", on_help=lambda: seen.append("help")),
+            "handled",
+        )
+        self.assertEqual(
+            run_global_command("stats", context="game", on_stats=lambda: seen.append("stats")),
+            "handled",
+        )
+        self.assertEqual(seen, ["help", "stats"])

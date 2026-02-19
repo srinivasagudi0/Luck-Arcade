@@ -1,7 +1,8 @@
 import random as rd
 from html import escape
-
 import streamlit as st
+from cli_utils import handle_global_command
+from stats import load_stats, update_and_persist_stats
 
 st.set_page_config(page_title="Luck Arcade", page_icon="🎰", layout="wide")
 
@@ -11,22 +12,24 @@ GAMES = {
     "Rock Paper Scissors": "rps",
     "Meteor Dodge": "meteor",
     "Planet Guess": "planet",
+    "Number Guess": "guess",
 }
 
 
 def _init_state():
+    persisted = load_stats()
     defaults = {
-        "stats_total": 0,
-        "stats_dice_win": 0,
-        "stats_dice_loss": 0,
-        "stats_coin_win": 0,
-        "stats_coin_loss": 0,
-        "stats_rps_win": 0,
-        "stats_rps_loss": 0,
-        "stats_meteor_win": 0,
-        "stats_meteor_loss": 0,
-        "stats_planet_win": 0,
-        "stats_planet_loss": 0,
+        "stats_total": persisted["stats_total"],
+        "stats_dice_win": persisted["stats_dice_win"],
+        "stats_dice_loss": persisted["stats_dice_loss"],
+        "stats_coin_win": persisted["stats_coin_win"],
+        "stats_coin_loss": persisted["stats_coin_loss"],
+        "stats_rps_win": persisted["stats_rps_win"],
+        "stats_rps_loss": persisted["stats_rps_loss"],
+        "stats_meteor_win": persisted["stats_meteor_win"],
+        "stats_meteor_loss": persisted["stats_meteor_loss"],
+        "stats_planet_win": persisted["stats_planet_win"],
+        "stats_planet_loss": persisted["stats_planet_loss"],
         "dice_attempts": 0,
         "coin_attempts": 0,
         "rps_attempts": 0,
@@ -37,6 +40,12 @@ def _init_state():
         "rps_history": [],
         "meteor_history": [],
         "planet_history": [],
+        "stats_guess_win": persisted["stats_guess_win"],
+        "stats_guess_loss": persisted["stats_guess_loss"],
+        "guess_attempts": 0,
+        "guess_history": [],
+        "guess_target": rd.randint(1, 10),
+        "guess_tries_left": 3,
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
@@ -44,7 +53,12 @@ def _init_state():
 
 def _reset_state():
     for key in list(st.session_state.keys()):
-        if key.startswith("stats_") or key.endswith("_history") or key.endswith("_attempts"):
+        if (
+            key.startswith("stats_")
+            or key.endswith("_history")
+            or key.endswith("_attempts")
+            or key in ("guess_target", "guess_tries_left")
+        ):
             del st.session_state[key]
     _init_state()
 
@@ -464,8 +478,10 @@ def _apply_theming():
 
 
 def _record_result(game: str, outcome: str, detail: str):
-    st.session_state["stats_total"] += 1
-    st.session_state[f"stats_{game}_{outcome}"] += 1
+    persisted = update_and_persist_stats(game, outcome)
+    st.session_state["stats_total"] = persisted["stats_total"]
+    st.session_state[f"stats_{game}_win"] = persisted[f"stats_{game}_win"]
+    st.session_state[f"stats_{game}_loss"] = persisted[f"stats_{game}_loss"]
     history_key = f"{game}_history"
     st.session_state[history_key].insert(0, detail)
     st.session_state[history_key] = st.session_state[history_key][:25]
@@ -485,7 +501,7 @@ def _header():
                 <span class="hero-chip">Rounds: {st.session_state["stats_total"]}</span>
                 <span class="hero-chip">Wins: {_total_wins()}</span>
                 <span class="hero-chip">Luck: {_luck_index()}</span>
-                <span class="hero-chip">Modes: 5</span>
+                <span class="hero-chip">Modes: {len(GAMES)}</span>
             </div>
         </section>
         """,
@@ -501,6 +517,7 @@ def _stats_bar():
         ("Rock Paper Scissors", f"{_wins('rps')}W / {_losses('rps')}L", f"{_win_rate('rps')} win rate"),
         ("Meteor Dodge", f"{_wins('meteor')}W / {_losses('meteor')}L", f"{_win_rate('meteor')} win rate"),
         ("Planet Guess", f"{_wins('planet')}W / {_losses('planet')}L", f"{_win_rate('planet')} win rate"),
+        ("Number Guess", f"{_wins('guess')}W / {_losses('guess')}L", f"{_win_rate('guess')} win rate"),
     ]
     cards_html = "".join(
         f"""
@@ -653,6 +670,53 @@ def _game_meteor():
         st.metric("Total attempts", st.session_state["meteor_attempts"])
         _render_history("Meteor Dodge", "meteor_history")
 
+def _game_number_guess():
+    _game_heading("🔢", "Number Guess", "You get 3 tries to find a number from 1 to 10.")
+    col1, col2 = st.columns([1.05, 0.95], gap="large")
+
+    if "guess_target" not in st.session_state:
+        st.session_state["guess_target"] = rd.randint(1, 10)
+    if "guess_tries_left" not in st.session_state:
+        st.session_state["guess_tries_left"] = 3
+
+    with col1:
+        st.markdown("Pick a number and submit your guess.")
+        guess = st.slider("Your guess", 1, 10, 5)
+
+        if st.button("Submit guess", key="guess-play"):
+            st.session_state["guess_attempts"] += 1
+            target = st.session_state["guess_target"]
+
+            if guess == target:
+                detail = f"Guessed {guess}, target was {target}, tries left {st.session_state['guess_tries_left'] - 1}"
+                _record_result("guess", "win", detail)
+                st.success(f"Correct. It was {target}.")
+                st.balloons()
+                st.session_state["guess_target"] = rd.randint(1, 10)
+                st.session_state["guess_tries_left"] = 3
+            else:
+                st.session_state["guess_tries_left"] -= 1
+                if st.session_state["guess_tries_left"] <= 0:
+                    detail = f"Missed 3 tries, target was {target}"
+                    _record_result("guess", "loss", detail)
+                    st.warning(f"Out of tries. The number was {target}.")
+                    st.session_state["guess_target"] = rd.randint(1, 10)
+                    st.session_state["guess_tries_left"] = 3
+                else:
+                    hint = "higher" if target > guess else "lower"
+                    st.info(f"Not this one. Try {hint}. Tries left: {st.session_state['guess_tries_left']}")
+
+        if st.button("Reset round", key="guess-reset"):
+            st.session_state["guess_target"] = rd.randint(1, 10)
+            st.session_state["guess_tries_left"] = 3
+            st.info("Started a fresh round.")
+
+    with col2:
+        st.metric("Total attempts", st.session_state["guess_attempts"])
+        st.metric("Tries left (current round)", st.session_state["guess_tries_left"])
+        _render_history("Number Guess", "guess_history")
+
+
 
 def _game_planet():
     _game_heading("🪐", "Planet Guess", "Guess the hidden planet from orbit 1 to 8.")
@@ -677,6 +741,41 @@ def _game_planet():
         st.metric("Total attempts", st.session_state["planet_attempts"])
         _render_history("Planet Guess", "planet_history")
 
+def _quick_command_panel():
+    st.markdown("---")
+    st.header("Quick Command")
+    with st.form("quick-command-form", clear_on_submit=True):
+        raw = st.text_input("Type a command", key="quick_cmd", placeholder="help, stats, reset")
+        submitted = st.form_submit_button("Run command", use_container_width=True)
+
+    if not submitted:
+        return
+
+    text = raw.strip()
+    if not text:
+        st.info("Enter a command to run.")
+        return
+
+    if text.lower() in ("reset", "clear"):
+        _reset_state()
+        st.success("Session reset. Saved totals are still available.")
+        return
+
+    action = handle_global_command(text, context="main_menu")
+
+    if action == "help":
+        st.info("Try: help, stats, reset")
+    elif action == "stats":
+        st.markdown(
+            f"**Total plays:** {st.session_state['stats_total']}  \n"
+            f"**Wins:** {_total_wins()}  \n"
+            f"**Luck index:** {_luck_index()}"
+        )
+    elif action in ("quit", "menu"):
+        st.warning(f"'{text}' is not used in Streamlit. Use the game picker in the sidebar.")
+    else:
+        st.error(f"Unknown command: '{text}'. Try 'help' for options.")
+
 
 def _sidebar():
     with st.sidebar:
@@ -686,15 +785,20 @@ def _sidebar():
             list(GAMES.keys()),
             index=0,
         )
+        st.caption(
+            f"Rounds {st.session_state['stats_total']} | Wins {_total_wins()} | Luck {_luck_index()}"
+        )
         st.markdown("---")
         st.header("Session Controls")
         st.button("Reset session", on_click=_reset_state, use_container_width=True)
         st.markdown(
-            '<p class="sidebar-note">Clears attempts, history, and all current session stats.</p>',
+            '<p class="sidebar-note">Clears local attempts and history. Saved totals remain available.</p>',
             unsafe_allow_html=True,
         )
-    return game
 
+        _quick_command_panel()
+
+    return game
 
 def main():
     _apply_theming()
@@ -712,8 +816,11 @@ def main():
         _game_meteor()
     elif game == "Planet Guess":
         _game_planet()
-    else:
+    elif game == "Rock Paper Scissors":
         _game_rps()
+    elif game == "Number Guess":
+        _game_number_guess()
+
 
     st.markdown('<div class="section-break"></div>', unsafe_allow_html=True)
     st.markdown(
@@ -725,6 +832,7 @@ def main():
             Rock Paper Scissors: ties are neutral and not logged as wins/losses.
             Meteor Dodge: win if your lane is different from the meteor lane.
             Planet Guess: win only on an exact orbit match.
+            Number Guess: win if you find the number in 3 tries.
         </div>
         """,
         unsafe_allow_html=True,
@@ -733,3 +841,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# 

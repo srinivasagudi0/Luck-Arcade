@@ -1,6 +1,7 @@
 import random as rd
 
-from cli_utils import prompt_nonempty, prompt_yes_no
+from cli_utils import prompt_nonempty, prompt_yes_no, run_global_command
+from stats import update_and_persist_stats
 
 
 def _normalize_choice(text: str) -> str | None:
@@ -22,6 +23,7 @@ def continuous_game_coin_flip():
     print("Coin Flip time.")
     print()
     print("Call it: Heads or Tails.")
+    print("Commands: help, stats, menu, quit")
 
     while True:
         user_input = prompt_nonempty(
@@ -32,6 +34,21 @@ def continuous_game_coin_flip():
         if user_input is None:
             print("Leaving coin flip. See you later.")
             return
+
+        signal = run_global_command(
+            user_input,
+            context="game",
+            on_help=lambda: print("Type heads/tails (or h/t). Use menu to return."),
+            on_stats=lambda: print(f"Attempts: {attempts} | Streak: {streak}"),
+        )
+        if signal == "quit":
+            print("Leaving coin flip. See you later.")
+            return
+        if signal == "menu":
+            print("Returning to main menu.")
+            return
+        if signal == "handled":
+            continue
 
         user_choice = _normalize_choice(user_input)
         if user_choice is None:
@@ -45,9 +62,11 @@ def continuous_game_coin_flip():
 
         if coin_result == user_choice:
             streak += 1
+            update_and_persist_stats("coin", "win")
             print("Nice call, you got it.")
         else:
             streak = 0
+            update_and_persist_stats("coin", "loss")
             print("Nope, not this one.")
 
         print(f"Attempts this session: {attempts}")
