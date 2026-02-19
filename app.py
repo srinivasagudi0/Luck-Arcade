@@ -1,6 +1,8 @@
 import random as rd
 from html import escape
+
 import streamlit as st
+
 from cli_utils import handle_global_command
 from stats import load_stats, update_and_persist_stats
 
@@ -13,6 +15,68 @@ GAMES = {
     "Meteor Dodge": "meteor",
     "Planet Guess": "planet",
     "Number Guess": "guess",
+}
+
+GAME_LABELS = {value: key for key, value in GAMES.items()}
+
+GAME_META = {
+    "Dice Roll": {
+        "icon": "🎲",
+        "subtitle": "Pick a number and see if the die agrees with you.",
+    },
+    "Coin Flip": {
+        "icon": "🪙",
+        "subtitle": "Call heads or tails and ride your luck.",
+    },
+    "Rock Paper Scissors": {
+        "icon": "✊",
+        "subtitle": "One clean round against the computer.",
+    },
+    "Meteor Dodge": {
+        "icon": "☄️",
+        "subtitle": "Choose your lane and avoid impact.",
+    },
+    "Planet Guess": {
+        "icon": "🪐",
+        "subtitle": "Scan the right orbit to lock onto the target.",
+    },
+    "Number Guess": {
+        "icon": "🔢",
+        "subtitle": "Find the hidden number in three tries.",
+    },
+}
+
+GAME_PLAYBOOK = {
+    "Dice Roll": (
+        "Set your target number from 1 to 6.",
+        "Press Roll once to launch the round.",
+        "Match the roll to score a win.",
+    ),
+    "Coin Flip": (
+        "Choose Heads or Tails.",
+        "Flip once to resolve instantly.",
+        "Matching side scores a win.",
+    ),
+    "Rock Paper Scissors": (
+        "Choose Rock, Paper, or Scissors.",
+        "Play one round against computer choice.",
+        "Ties are neutral and not logged.",
+    ),
+    "Meteor Dodge": (
+        "Pick your lane: Left, Center, or Right.",
+        "Engage thrusters to reveal meteor lane.",
+        "Avoid the meteor lane to win.",
+    ),
+    "Planet Guess": (
+        "Scan an orbit from 1 to 8.",
+        "Ping to compare your orbit with target.",
+        "Exact orbit lock is a win.",
+    ),
+    "Number Guess": (
+        "Pick a number from 1 to 10.",
+        "Use higher/lower hints across 3 tries.",
+        "Find the target before tries run out.",
+    ),
 }
 
 
@@ -30,20 +94,21 @@ def _init_state():
         "stats_meteor_loss": persisted["stats_meteor_loss"],
         "stats_planet_win": persisted["stats_planet_win"],
         "stats_planet_loss": persisted["stats_planet_loss"],
+        "stats_guess_win": persisted["stats_guess_win"],
+        "stats_guess_loss": persisted["stats_guess_loss"],
         "dice_attempts": 0,
         "coin_attempts": 0,
         "rps_attempts": 0,
         "meteor_attempts": 0,
         "planet_attempts": 0,
+        "guess_attempts": 0,
         "dice_history": [],
         "coin_history": [],
         "rps_history": [],
         "meteor_history": [],
         "planet_history": [],
-        "stats_guess_win": persisted["stats_guess_win"],
-        "stats_guess_loss": persisted["stats_guess_loss"],
-        "guess_attempts": 0,
         "guess_history": [],
+        "activity_feed": [],
         "guess_target": rd.randint(1, 10),
         "guess_tries_left": 3,
     }
@@ -57,7 +122,7 @@ def _reset_state():
             key.startswith("stats_")
             or key.endswith("_history")
             or key.endswith("_attempts")
-            or key in ("guess_target", "guess_tries_left")
+            or key in ("activity_feed", "guess_target", "guess_tries_left")
         ):
             del st.session_state[key]
     _init_state()
@@ -82,6 +147,13 @@ def _win_rate(game: str) -> str:
     return f"{round((_wins(game) / plays) * 100)}%"
 
 
+def _win_rate_number(game: str) -> int:
+    plays = _plays(game)
+    if plays == 0:
+        return 0
+    return round((_wins(game) / plays) * 100)
+
+
 def _total_wins() -> int:
     return sum(_wins(game_key) for game_key in GAMES.values())
 
@@ -93,354 +165,250 @@ def _luck_index() -> str:
     return f"{round((_total_wins() / total) * 100)}%"
 
 
+def _luck_index_number() -> int:
+    total = st.session_state["stats_total"]
+    if total == 0:
+        return 0
+    return round((_total_wins() / total) * 100)
+
+
 def _apply_theming():
     st.markdown(
         """
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
         :root {
-            --arc-ink: #11231d;
-            --arc-muted: #35564d;
-            --arc-paper: rgba(255, 252, 245, 0.78);
-            --arc-edge: rgba(17, 35, 29, 0.14);
-            --arc-green: #0b8a67;
-            --arc-gold: #c68015;
-            --arc-sea: #0f6a89;
-            --arc-shadow: 0 18px 40px rgba(17, 35, 29, 0.12);
+            --bg: #0f172a;
+            --panel: #111b30;
+            --panel-2: #0d1526;
+            --text: #e6ecf5;
+            --muted: #9fb3d1;
+            --accent: #4f9cff;
+            --accent-2: #22c55e;
+            --edge: rgba(255,255,255,0.06);
+            --shadow: 0 16px 30px rgba(0,0,0,0.35);
         }
 
         html, body, [class*="css"] {
-            font-family: "Bricolage Grotesque", sans-serif;
-            color: var(--arc-ink);
+            font-family: "Poppins", sans-serif;
+            color: var(--text);
         }
 
         .stApp {
-            background:
-                radial-gradient(circle at 18% 18%, rgba(11, 138, 103, 0.22) 0%, transparent 40%),
-                radial-gradient(circle at 86% 8%, rgba(198, 128, 21, 0.24) 0%, transparent 37%),
-                linear-gradient(145deg, #f4efe4 0%, #f4f2ea 45%, #e5efe8 100%);
-        }
-
-        .arcade-backdrop {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: -2;
-            opacity: 0.52;
-            background:
-                linear-gradient(90deg, rgba(17, 35, 29, 0.06) 1px, transparent 1px),
-                linear-gradient(0deg, rgba(17, 35, 29, 0.06) 1px, transparent 1px);
-            background-size: 34px 34px;
-        }
-
-        .arcade-noise {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: -1;
-            opacity: 0.17;
-            mix-blend-mode: soft-light;
-            background-image: radial-gradient(rgba(0, 0, 0, 0.32) 0.7px, transparent 0.7px);
-            background-size: 2px 2px;
+            background: radial-gradient(circle at 12% 20%, rgba(79,156,255,0.12), transparent 26%),
+                        radial-gradient(circle at 82% 12%, rgba(34,197,94,0.10), transparent 26%),
+                        linear-gradient(140deg, #0b1222 0%, #0f172a 40%, #0b1222 100%);
         }
 
         .main .block-container {
-            max-width: 1260px;
-            padding-top: 1.35rem;
-            padding-bottom: 2.2rem;
+            max-width: 1180px;
+            padding-top: 0.8rem;
+            padding-bottom: 1.6rem;
         }
 
         .hero {
-            position: relative;
-            overflow: hidden;
-            border-radius: 22px;
-            border: 1px solid var(--arc-edge);
-            background:
-                linear-gradient(120deg, rgba(255, 252, 245, 0.9), rgba(244, 252, 248, 0.84)),
-                linear-gradient(210deg, rgba(11, 138, 103, 0.15), rgba(198, 128, 21, 0.14));
-            box-shadow: var(--arc-shadow);
-            padding: 1.6rem 1.6rem 1.35rem;
-            margin-bottom: 1rem;
-        }
-
-        .hero::after {
-            content: "";
-            position: absolute;
-            inset: auto -22% -70% auto;
-            width: 340px;
-            height: 340px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(11, 138, 103, 0.22), transparent 67%);
-            animation: arcPulse 9s ease-in-out infinite;
+            border-radius: 18px;
+            border: 1px solid var(--edge);
+            background: var(--panel);
+            box-shadow: var(--shadow);
+            padding: 1.1rem 1.2rem 1rem;
+            margin-bottom: 0.75rem;
         }
 
         .hero-kicker {
             margin: 0;
-            color: var(--arc-green);
+            color: var(--accent);
             text-transform: uppercase;
-            letter-spacing: 0.16em;
-            font-weight: 800;
-            font-size: 0.79rem;
+            letter-spacing: 0.12em;
+            font-weight: 700;
+            font-size: 0.72rem;
         }
 
         .hero-title {
-            margin: 0.3rem 0 0.45rem;
-            font-size: clamp(2rem, 4vw, 3.2rem);
-            line-height: 1.06;
-            letter-spacing: -0.02em;
-            color: var(--arc-ink);
+            margin: 0.2rem 0 0.35rem;
+            color: var(--text);
+            font-size: clamp(1.6rem, 3vw, 2.3rem);
+            line-height: 1.05;
+            letter-spacing: -0.01em;
         }
 
         .hero-copy {
             margin: 0;
-            max-width: 900px;
-            color: var(--arc-muted);
-            font-size: 1.03rem;
-            line-height: 1.4;
+            color: var(--muted);
+            font-size: 0.98rem;
+            line-height: 1.36;
         }
 
         .hero-row {
-            margin-top: 0.9rem;
+            margin-top: 0.65rem;
             display: flex;
             flex-wrap: wrap;
-            gap: 0.55rem;
+            gap: 0.45rem;
         }
 
         .hero-chip {
             display: inline-flex;
             align-items: center;
-            border-radius: 999px;
-            border: 1px solid var(--arc-edge);
-            background: rgba(255, 252, 245, 0.9);
-            color: #17342c;
-            padding: 0.28rem 0.72rem;
-            font-size: 0.82rem;
-            font-weight: 700;
-            box-shadow: 0 4px 14px rgba(17, 35, 29, 0.09);
-        }
-
-        .score-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-            gap: 0.72rem;
-            margin: 0.5rem 0 0.95rem;
-        }
-
-        .score-card {
-            border-radius: 16px;
-            border: 1px solid var(--arc-edge);
-            padding: 0.88rem 0.95rem 0.9rem;
-            background: var(--arc-paper);
-            box-shadow: var(--arc-shadow);
-        }
-
-        .score-label {
-            margin: 0;
-            text-transform: uppercase;
-            letter-spacing: 0.11em;
-            font-size: 0.68rem;
-            font-weight: 800;
-            color: #3f5b53;
-        }
-
-        .score-value {
-            margin: 0.34rem 0 0.2rem;
-            color: #10251f;
-            font-size: 1.3rem;
-            font-weight: 800;
-            line-height: 1;
-        }
-
-        .score-sub {
-            margin: 0;
-            color: #4b665e;
-            font-size: 0.76rem;
-            font-weight: 600;
-            letter-spacing: 0.03em;
-        }
-
-        .game-heading {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-            margin-bottom: 0.9rem;
-        }
-
-        .game-icon {
-            width: 46px;
-            height: 46px;
-            border-radius: 13px;
-            display: grid;
-            place-items: center;
-            font-size: 1.42rem;
-            background: linear-gradient(140deg, rgba(11, 138, 103, 0.82), rgba(15, 106, 137, 0.74));
-            box-shadow: 0 9px 18px rgba(11, 138, 103, 0.22);
-        }
-
-        .game-title {
-            margin: 0;
-            color: #10251f;
-            font-size: clamp(1.45rem, 2.6vw, 1.88rem);
-            line-height: 1.05;
-            letter-spacing: -0.01em;
-        }
-
-        .game-subtitle {
-            margin: 0.25rem 0 0;
-            color: #46635a;
-            font-size: 0.95rem;
-        }
-
-        .stButton > button {
-            border-radius: 999px;
-            border: 1px solid rgba(17, 35, 29, 0.2);
-            color: #17342c;
-            background: linear-gradient(120deg, rgba(11, 138, 103, 0.3), rgba(198, 128, 21, 0.34));
-            font-weight: 800;
-            letter-spacing: 0.01em;
-            box-shadow: 0 8px 18px rgba(17, 35, 29, 0.15);
-            transition: transform 150ms ease, box-shadow 180ms ease, filter 180ms ease;
-        }
-
-        .stButton > button:hover {
-            transform: translateY(-1px);
-            filter: saturate(1.1);
-            box-shadow: 0 12px 24px rgba(17, 35, 29, 0.18);
-        }
-
-        .stButton > button:focus {
-            border-color: rgba(11, 138, 103, 0.7);
-            box-shadow: 0 0 0 0.22rem rgba(11, 138, 103, 0.24);
-        }
-
-        div[data-testid="stMetric"] {
-            border-radius: 15px;
-            border: 1px solid var(--arc-edge);
-            background: var(--arc-paper);
-            padding: 0.76rem 0.95rem;
-            box-shadow: 0 8px 20px rgba(17, 35, 29, 0.09);
-        }
-
-        div[data-testid="stMetricValue"] {
-            color: #0f2922;
-            font-weight: 800;
-        }
-
-        div[data-testid="stMetricLabel"] {
-            color: #46635a;
-            text-transform: uppercase;
-            letter-spacing: 0.09em;
-            font-size: 0.69rem;
+            border-radius: 12px;
+            border: 1px solid var(--edge);
+            background: var(--panel-2);
+            color: var(--text);
+            padding: 0.28rem 0.65rem;
+            font-size: 0.78rem;
             font-weight: 700;
         }
 
-        div[data-testid="stSlider"] [role="slider"] {
-            background: var(--arc-ink) !important;
-            border: 2px solid rgba(255, 255, 255, 0.9);
-        }
-
-        div[data-testid="stSlider"] div[data-baseweb="slider"] > div > div:first-child {
-            background: linear-gradient(90deg, var(--arc-green), var(--arc-gold));
-            height: 0.5rem;
-        }
-
-        div[data-testid="stSegmentedControl"] div[role="radiogroup"] {
-            gap: 0.4rem;
-            background: rgba(255, 252, 245, 0.62);
-            border: 1px solid var(--arc-edge);
-            border-radius: 999px;
-            padding: 0.34rem;
-        }
-
-        div[data-testid="stSegmentedControl"] label {
-            border-radius: 999px;
-            color: #315047;
-            font-weight: 700;
-            border: 1px solid rgba(17, 35, 29, 0.09);
-            transition: background 120ms ease, color 120ms ease, transform 120ms ease;
-        }
-
-        div[data-testid="stSegmentedControl"] label:has(input:checked) {
-            background: linear-gradient(120deg, rgba(11, 138, 103, 0.27), rgba(198, 128, 21, 0.28));
-            color: #17342c;
-            transform: translateY(-1px);
-        }
-
-        div[data-testid="stRadio"] > div {
-            background: rgba(255, 252, 245, 0.62);
-            border: 1px solid var(--arc-edge);
+        .panel {
             border-radius: 14px;
-            padding: 0.5rem 0.56rem;
-        }
-
-        div[data-testid="stRadio"] label p {
-            color: #204239;
-            font-weight: 700;
-        }
-
-        .history-card {
-            border-radius: 16px;
-            border: 1px solid var(--arc-edge);
-            background: var(--arc-paper);
-            box-shadow: var(--arc-shadow);
+            border: 1px solid var(--edge);
+            background: var(--panel);
+            box-shadow: var(--shadow);
             padding: 0.9rem 1rem;
-        }
-
-        .history-title {
-            margin: 0;
-            color: #17342c;
-            font-size: 0.89rem;
-            font-weight: 800;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-        }
-
-        .history-card ul {
-            margin: 0.54rem 0 0;
-            padding-left: 1.08rem;
-        }
-
-        .history-card li {
-            margin-bottom: 0.28rem;
-            color: #2f4d45;
-            font-family: "Space Mono", monospace;
-            font-size: 0.82rem;
-            line-height: 1.35;
-        }
-
-        .history-empty {
-            border-radius: 14px;
-            border: 1px dashed rgba(17, 35, 29, 0.2);
-            background: rgba(255, 252, 245, 0.56);
-            padding: 0.86rem 0.95rem;
-            color: #44655c;
-            font-size: 0.9rem;
-            font-weight: 600;
         }
 
         .section-break {
             height: 1px;
-            margin: 1rem 0 1.15rem;
-            background: linear-gradient(90deg, transparent, rgba(17, 35, 29, 0.25), transparent);
+            margin: 0.9rem 0 1rem;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
         }
 
-        .rulebook {
-            border: 1px solid var(--arc-edge);
-            border-radius: 16px;
-            background: var(--arc-paper);
-            box-shadow: var(--arc-shadow);
-            padding: 0.95rem 1rem;
-            color: #315047;
-            font-size: 0.89rem;
-            line-height: 1.45;
+        div[data-testid="stMetric"] {
+            border-radius: 12px;
+            border: 1px solid var(--edge);
+            background: var(--panel-2);
+            padding: 0.7rem 0.8rem;
+            box-shadow: var(--shadow);
+        }
+
+        div[data-testid="stMetricValue"] {
+            color: var(--text);
+            font-weight: 800;
+        }
+
+        div[data-testid="stMetricLabel"] {
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-size: 0.68rem;
+            font-weight: 700;
+        }
+
+        div[data-testid="stSlider"] [role="slider"] {
+            background: var(--accent) !important;
+            border: 2px solid rgba(255,255,255,0.8);
+        }
+
+        div[data-testid="stSlider"] div[data-baseweb="slider"] > div > div:first-child {
+            background: var(--accent);
+            height: 0.48rem;
+        }
+
+        div[data-testid="stSegmentedControl"] div[role="radiogroup"] {
+            gap: 0.3rem;
+            background: var(--panel-2);
+            border: 1px solid var(--edge);
+            border-radius: 12px;
+            padding: 0.32rem;
+        }
+
+        div[data-testid="stSegmentedControl"] label {
+            border-radius: 10px;
+            color: var(--text);
+            font-weight: 600;
+            border: 1px solid var(--edge);
+        }
+
+        div[data-testid="stSegmentedControl"] label:has(input:checked) {
+            background: var(--accent);
+            color: #0b1222;
+            border-color: var(--accent);
+        }
+
+        div[data-testid="stRadio"] > div {
+            background: var(--panel-2);
+            border: 1px solid var(--edge);
+            border-radius: 12px;
+            padding: 0.45rem 0.55rem;
+        }
+
+        div[data-testid="stRadio"] label p {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        div[data-baseweb="input"] > div {
+            border-radius: 10px;
+            border-color: var(--edge);
+            background: var(--panel-2);
+        }
+
+        div[data-baseweb="input"] input {
+            color: var(--text) !important;
+        }
+
+        div[data-baseweb="input"] input::placeholder {
+            color: var(--muted) !important;
+        }
+
+        .result-banner {
+            border-radius: 12px;
+            border: 1px solid var(--edge);
+            padding: 0.6rem 0.7rem;
+            margin-top: 0.35rem;
+            box-shadow: var(--shadow);
+            background: var(--panel-2);
+        }
+
+        .result-top {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.42rem;
+            font-weight: 800;
+            font-size: 0.9rem;
+        }
+
+        .result-text {
+            margin: 0.18rem 0 0;
+            color: var(--muted);
+            font-size: 0.82rem;
+            line-height: 1.32;
+            font-weight: 600;
+        }
+
+        .result-win { border-color: rgba(34,197,94,0.5); }
+        .result-loss { border-color: rgba(239,68,68,0.5); }
+        .result-neutral { border-color: rgba(255,255,255,0.12); }
+
+        .history-card, .feed-card, .rulebook {
+            border-radius: 12px;
+            border: 1px solid var(--edge);
+            background: var(--panel);
+            box-shadow: var(--shadow);
+            padding: 0.8rem 0.9rem;
+        }
+
+        .history-title, .feed-title, .rulebook-title {
+            margin: 0;
+            color: var(--text);
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+
+        .history-card li,
+        .feed-item,
+        .rulebook-copy,
+        .rulebook-list li {
+            color: var(--muted);
+            font-size: 0.84rem;
+            line-height: 1.32;
         }
 
         section[data-testid="stSidebar"] {
-            background:
-                linear-gradient(165deg, rgba(246, 240, 227, 0.95), rgba(232, 242, 236, 0.92)),
-                linear-gradient(190deg, rgba(11, 138, 103, 0.14), rgba(198, 128, 21, 0.14));
-            border-right: 1px solid rgba(17, 35, 29, 0.12);
+            background: linear-gradient(160deg, #0c1324 0%, #0a1020 100%);
+            border-right: 1px solid var(--edge);
         }
 
         section[data-testid="stSidebar"] h1,
@@ -448,28 +416,17 @@ def _apply_theming():
         section[data-testid="stSidebar"] h3,
         section[data-testid="stSidebar"] label,
         section[data-testid="stSidebar"] p {
-            color: #1d3c33;
+            color: var(--text);
         }
 
         .sidebar-note {
-            color: #33584f;
-            font-size: 0.83rem;
-            line-height: 1.35;
-            margin-top: 0.15rem;
-        }
-
-        @keyframes arcPulse {
-            0%, 100% { transform: scale(1); opacity: 0.7; }
-            50% { transform: scale(1.12); opacity: 0.96; }
+            color: var(--muted);
+            font-size: 0.82rem;
         }
 
         @media (max-width: 900px) {
-            .hero {
-                padding: 1.2rem 1.15rem 1.1rem;
-            }
-            .score-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
+            .hero { padding: 0.9rem 1rem; }
+            .main .block-container { padding-top: 0.6rem; }
         }
         </style>
         """,
@@ -485,23 +442,127 @@ def _record_result(game: str, outcome: str, detail: str):
     history_key = f"{game}_history"
     st.session_state[history_key].insert(0, detail)
     st.session_state[history_key] = st.session_state[history_key][:25]
+    game_label = GAME_LABELS[game]
+    icon = GAME_META[game_label]["icon"]
+    result_tag = "WIN" if outcome == "win" else "LOSS"
+    st.session_state["activity_feed"].insert(0, f"{icon} {game_label}: {detail} [{result_tag}]")
+    st.session_state["activity_feed"] = st.session_state["activity_feed"][:30]
 
 
-def _header():
-    st.markdown('<div class="arcade-backdrop"></div><div class="arcade-noise"></div>', unsafe_allow_html=True)
+def _result_banner(kind: str, title: str, detail: str, icon: str):
+    safe_kind = kind if kind in {"win", "loss", "neutral"} else "neutral"
+    st.markdown(
+        f"""
+        <div class="result-banner result-{safe_kind}">
+            <p class="result-top">{escape(icon)} {escape(title)}</p>
+            <p class="result-text">{escape(detail)}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _best_game_summary() -> str:
+    played = [
+        (label, _win_rate_number(game), _plays(game))
+        for label, game in GAMES.items()
+        if _plays(game) > 0
+    ]
+    if not played:
+        return "No leading sector yet"
+
+    label, rate, rounds = max(played, key=lambda item: (item[1], item[2]))
+    return f"Top sector: {label} ({rate}% over {rounds} rounds)"
+
+
+def _sidebar_game_cards(active_game: str):
+    cards = []
+    for label, game in GAMES.items():
+        meta = GAME_META[label]
+        cards.append(
+            {
+                "label": label,
+                "icon": meta["icon"],
+                "subtitle": meta["subtitle"],
+                "rate": _win_rate(game),
+                "active": label == active_game,
+            }
+        )
+
+    rows = st.container()
+    for card in cards:
+        rows.markdown(
+            f"""
+            <article class="selector-card{' active' if card['active'] else ''}">
+                <div class="selector-row">
+                    <p class="selector-title">{escape(card['icon'])} {escape(card['label'])}</p>
+                    <span class="selector-rate">Win {escape(card['rate'])}</span>
+                </div>
+                <p class="selector-sub">{escape(card['subtitle'])}</p>
+            </article>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def _activity_feed_panel():
+    feed = st.session_state["activity_feed"][:8]
+    if not feed:
+        st.markdown(
+            """
+            <section class="feed-card">
+                <p class="feed-title">Flight Log</p>
+                <p class="feed-empty">No rounds recorded yet. Play any sector to start the log.</p>
+            </section>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    items_html = "".join(f'<div class="feed-item">{escape(item)}</div>' for item in feed)
+    st.markdown(
+        f"""
+        <section class="feed-card">
+            <p class="feed-title">Flight Log</p>
+            <div class="feed-list">{items_html}</div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _mission_brief(active_game: str):
+    steps = GAME_PLAYBOOK[active_game]
+    active_meta = GAME_META[active_game]
+    items_html = "".join(f"<li>{escape(step)}</li>" for step in steps)
+    st.markdown(
+        f"""
+        <section class="brief-card">
+            <p class="brief-kicker">How to play</p>
+            <p class="brief-title">{escape(active_meta['icon'])} {escape(active_game)}</p>
+            <ol class="brief-list">{items_html}</ol>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _header(active_game: str):
+    active_icon = GAME_META[active_game]["icon"]
+    active_subtitle = GAME_META[active_game]["subtitle"]
     st.markdown(
         f"""
         <section class="hero">
-            <p class="hero-kicker">Luck Arcade Session</p>
-            <h1 class="hero-title">Quick Arcade Rounds</h1>
+            <p class="hero-kicker">Luck Arcade</p>
+            <h1 class="hero-title">Arcade Hub</h1>
             <p class="hero-copy">
-                Roll, flip, duel, dodge, and guess. Stats update live while you play.
+                Quick mini-games with instant results. Active game: <strong>{escape(active_icon)} {escape(active_game)}</strong> — {escape(active_subtitle)}
             </p>
             <div class="hero-row">
                 <span class="hero-chip">Rounds: {st.session_state["stats_total"]}</span>
                 <span class="hero-chip">Wins: {_total_wins()}</span>
-                <span class="hero-chip">Luck: {_luck_index()}</span>
-                <span class="hero-chip">Modes: {len(GAMES)}</span>
+                <span class="hero-chip">Win rate: {_luck_index()}</span>
+                <span class="hero-chip">Games: {len(GAMES)}</span>
             </div>
         </section>
         """,
@@ -511,25 +572,21 @@ def _header():
 
 def _stats_bar():
     cards = [
-        ("Total Plays", str(st.session_state["stats_total"]), "All games together"),
-        ("Dice Roll", f"{_wins('dice')}W / {_losses('dice')}L", f"{_win_rate('dice')} win rate"),
-        ("Coin Flip", f"{_wins('coin')}W / {_losses('coin')}L", f"{_win_rate('coin')} win rate"),
-        ("Rock Paper Scissors", f"{_wins('rps')}W / {_losses('rps')}L", f"{_win_rate('rps')} win rate"),
-        ("Meteor Dodge", f"{_wins('meteor')}W / {_losses('meteor')}L", f"{_win_rate('meteor')} win rate"),
-        ("Planet Guess", f"{_wins('planet')}W / {_losses('planet')}L", f"{_win_rate('planet')} win rate"),
-        ("Number Guess", f"{_wins('guess')}W / {_losses('guess')}L", f"{_win_rate('guess')} win rate"),
+        ("Total rounds", st.session_state["stats_total"], "Across all games"),
+        ("Total wins", _total_wins(), "Across all games"),
+        ("Win rate", _luck_index(), "Across all games"),
+        ("Dice Roll", f"{_wins('dice')}W / {_losses('dice')}L", f"{_win_rate('dice')} WR"),
+        ("Coin Flip", f"{_wins('coin')}W / {_losses('coin')}L", f"{_win_rate('coin')} WR"),
+        ("RPS", f"{_wins('rps')}W / {_losses('rps')}L", f"{_win_rate('rps')} WR"),
+        ("Meteor", f"{_wins('meteor')}W / {_losses('meteor')}L", f"{_win_rate('meteor')} WR"),
+        ("Planet", f"{_wins('planet')}W / {_losses('planet')}L", f"{_win_rate('planet')} WR"),
+        ("Number Guess", f"{_wins('guess')}W / {_losses('guess')}L", f"{_win_rate('guess')} WR"),
     ]
-    cards_html = "".join(
-        f"""
-        <article class="score-card">
-            <p class="score-label">{escape(label)}</p>
-            <p class="score-value">{escape(value)}</p>
-            <p class="score-sub">{escape(subtext)}</p>
-        </article>
-        """
-        for label, value, subtext in cards
-    )
-    st.markdown(f'<section class="score-grid">{cards_html}</section>', unsafe_allow_html=True)
+    for start in range(0, len(cards), 3):
+        row = cards[start : start + 3]
+        cols = st.columns(len(row))
+        for col, (label, value, subtext) in zip(cols, row):
+            col.metric(label, value, subtext)
 
 
 def _render_history(title: str, history_key: str):
@@ -553,9 +610,10 @@ def _render_history(title: str, history_key: str):
     )
 
 
-def _game_heading(icon: str, title: str, subtitle: str):
+def _game_heading(icon: str, title: str, subtitle: str, tip: str):
     st.markdown(
         f"""
+        <section class="game-shell">
         <div class="game-heading">
             <div class="game-icon">{escape(icon)}</div>
             <div>
@@ -563,23 +621,37 @@ def _game_heading(icon: str, title: str, subtitle: str):
                 <p class="game-subtitle">{escape(subtitle)}</p>
             </div>
         </div>
+        <div class="game-tip">{escape(tip)}</div>
+        </section>
         """,
         unsafe_allow_html=True,
     )
 
 
 def _game_dice():
-    _game_heading("🎲", "Dice Roll", "Pick a number from 1 to 6 and try to hit it.")
+    _game_heading(
+        "🎲",
+        "Dice Roll",
+        "Pick a number from 1 to 6 and try to hit it.",
+        "One tap, one roll. Clean and quick.",
+    )
     col1, col2 = st.columns([1.05, 0.95], gap="large")
     with col1:
-        st.markdown("Pick your number, then roll once.")
         prediction = st.slider("Your prediction", 1, 6, 3)
         if st.button("Roll the die", key="dice-roll"):
             st.session_state["dice_attempts"] += 1
             roll = rd.randint(1, 6)
             outcome = "win" if roll == prediction else "loss"
             _record_result("dice", outcome, f"Predicted {prediction}, rolled {roll}")
-            st.success(f"Rolled {roll}. {'You got it.' if outcome == 'win' else 'Miss this round.'}")
+            if outcome == "win":
+                _result_banner("win", f"Rolled {roll}", "Perfect call. You matched the die.", "🎲")
+            else:
+                _result_banner(
+                    "loss",
+                    f"Rolled {roll}",
+                    f"You predicted {prediction}. Queue up another round.",
+                    "🎲",
+                )
 
     with col2:
         st.metric("Total attempts", st.session_state["dice_attempts"])
@@ -587,21 +659,29 @@ def _game_dice():
 
 
 def _game_coin():
-    _game_heading("🪙", "Coin Flip", "Call heads or tails and see what happens.")
+    _game_heading(
+        "🪙",
+        "Coin Flip",
+        "Call heads or tails and see what happens.",
+        "Short rounds with instant result tracking.",
+    )
     col1, col2 = st.columns([1.05, 0.95], gap="large")
     with col1:
-        st.markdown("Pick a side, then flip.")
-        choice = st.segmented_control(
-            "Your call",
-            options=["Heads", "Tails"],
-            default="Heads",
-        )
+        choice = st.segmented_control("Your call", options=["Heads", "Tails"], default="Heads")
         if st.button("Flip coin", key="coin-flip"):
             st.session_state["coin_attempts"] += 1
             result = rd.choice(["Heads", "Tails"])
             outcome = "win" if result == choice else "loss"
             _record_result("coin", outcome, f"Called {choice}, got {result}")
-            st.info(f"Coin: {result}. {'Nice call.' if outcome == 'win' else 'No luck this one.'}")
+            if outcome == "win":
+                _result_banner("win", f"Coin landed {result}", "Clean read on the flip.", "🪙")
+            else:
+                _result_banner(
+                    "loss",
+                    f"Coin landed {result}",
+                    f"You called {choice}. Try a quick rematch.",
+                    "🪙",
+                )
 
     with col2:
         st.metric("Total attempts", st.session_state["coin_attempts"])
@@ -620,29 +700,29 @@ def _rps_winner(user: str, comp: str) -> str:
 
 
 def _game_rps():
-    _game_heading("✊", "Rock Paper Scissors", "Pick your move and face the computer.")
+    _game_heading(
+        "✊",
+        "Rock Paper Scissors",
+        "Pick your move and face the computer.",
+        "Ties are neutral and do not affect win/loss stats.",
+    )
     choices = ["Rock", "Paper", "Scissors"]
     col1, col2 = st.columns([1.05, 0.95], gap="large")
     with col1:
-        st.markdown("Choose your move, then play one round.")
-        user_choice = st.segmented_control(
-            "Your choice",
-            options=choices,
-            default="Rock",
-        )
+        user_choice = st.segmented_control("Your choice", options=choices, default="Rock")
         if st.button("Play", key="rps-play"):
             st.session_state["rps_attempts"] += 1
             comp_choice = rd.choice(choices)
             result = _rps_winner(user_choice, comp_choice)
             detail = f"You: {user_choice} | Computer: {comp_choice}"
             if result == "tie":
-                st.warning(f"Tie round. {detail}")
+                _result_banner("neutral", "Tie round", detail, "✊")
             elif result == "win":
-                st.success(f"You win this round. {detail}")
-            else:
-                st.info(f"Computer wins this round. {detail}")
-            if result != "tie":
                 _record_result("rps", result, detail)
+                _result_banner("win", "You won the round", detail, "✊")
+            else:
+                _record_result("rps", result, detail)
+                _result_banner("loss", "Computer won the round", detail, "✊")
 
     with col2:
         st.metric("Total attempts", st.session_state["rps_attempts"])
@@ -650,10 +730,14 @@ def _game_rps():
 
 
 def _game_meteor():
-    _game_heading("☄️", "Meteor Dodge", "Pick a lane and hope the meteor misses.")
+    _game_heading(
+        "☄️",
+        "Meteor Dodge",
+        "Pick a lane and hope the meteor misses.",
+        "If the meteor lands in your lane, it is a loss.",
+    )
     col1, col2 = st.columns([1.05, 0.95], gap="large")
     with col1:
-        st.markdown("Pick a lane, then fire thrusters.")
         lane = st.segmented_control("Your lane", options=["Left", "Center", "Right"], default="Center")
         if st.button("Engage thrusters", key="meteor-play"):
             st.session_state["meteor_attempts"] += 1
@@ -661,68 +745,25 @@ def _game_meteor():
             outcome = "loss" if incoming == lane else "win"
             detail = f"Lane: {lane} | Meteor: {incoming}"
             if outcome == "win":
-                st.success(f"Safe. Meteor came through {incoming}.")
+                _result_banner("win", "Safe passage", f"Meteor crossed {incoming}. You chose {lane}.", "☄️")
             else:
-                st.warning(f"Hit. Meteor came through {incoming}.")
+                _result_banner("loss", "Direct hit", f"Meteor crossed {incoming}. You chose {lane}.", "☄️")
             _record_result("meteor", outcome, detail)
 
     with col2:
         st.metric("Total attempts", st.session_state["meteor_attempts"])
         _render_history("Meteor Dodge", "meteor_history")
 
-def _game_number_guess():
-    _game_heading("🔢", "Number Guess", "You get 3 tries to find a number from 1 to 10.")
-    col1, col2 = st.columns([1.05, 0.95], gap="large")
-
-    if "guess_target" not in st.session_state:
-        st.session_state["guess_target"] = rd.randint(1, 10)
-    if "guess_tries_left" not in st.session_state:
-        st.session_state["guess_tries_left"] = 3
-
-    with col1:
-        st.markdown("Pick a number and submit your guess.")
-        guess = st.slider("Your guess", 1, 10, 5)
-
-        if st.button("Submit guess", key="guess-play"):
-            st.session_state["guess_attempts"] += 1
-            target = st.session_state["guess_target"]
-
-            if guess == target:
-                detail = f"Guessed {guess}, target was {target}, tries left {st.session_state['guess_tries_left'] - 1}"
-                _record_result("guess", "win", detail)
-                st.success(f"Correct. It was {target}.")
-                st.balloons()
-                st.session_state["guess_target"] = rd.randint(1, 10)
-                st.session_state["guess_tries_left"] = 3
-            else:
-                st.session_state["guess_tries_left"] -= 1
-                if st.session_state["guess_tries_left"] <= 0:
-                    detail = f"Missed 3 tries, target was {target}"
-                    _record_result("guess", "loss", detail)
-                    st.warning(f"Out of tries. The number was {target}.")
-                    st.session_state["guess_target"] = rd.randint(1, 10)
-                    st.session_state["guess_tries_left"] = 3
-                else:
-                    hint = "higher" if target > guess else "lower"
-                    st.info(f"Not this one. Try {hint}. Tries left: {st.session_state['guess_tries_left']}")
-
-        if st.button("Reset round", key="guess-reset"):
-            st.session_state["guess_target"] = rd.randint(1, 10)
-            st.session_state["guess_tries_left"] = 3
-            st.info("Started a fresh round.")
-
-    with col2:
-        st.metric("Total attempts", st.session_state["guess_attempts"])
-        st.metric("Tries left (current round)", st.session_state["guess_tries_left"])
-        _render_history("Number Guess", "guess_history")
-
-
 
 def _game_planet():
-    _game_heading("🪐", "Planet Guess", "Guess the hidden planet from orbit 1 to 8.")
+    _game_heading(
+        "🪐",
+        "Planet Guess",
+        "Guess the hidden planet from orbit 1 to 8.",
+        "Exact match wins. You get a higher/lower hint on misses.",
+    )
     col1, col2 = st.columns([1.05, 0.95], gap="large")
     with col1:
-        st.markdown("Set your orbit guess, then ping.")
         guess = st.slider("Your scan orbit", 1, 8, 4)
         if st.button("Ping the planet", key="planet-play"):
             st.session_state["planet_attempts"] += 1
@@ -731,21 +772,97 @@ def _game_planet():
             detail = f"Guessed {guess}, target was {target}"
             if outcome == "win":
                 st.balloons()
-                st.success("You found it.")
+                _result_banner("win", "Target located", f"Orbit {guess} was the correct scan.", "🪐")
             else:
                 hint = "higher" if target > guess else "lower"
-                st.info(f"Not orbit {guess}. Hint: try {hint}.")
+                _result_banner(
+                    "neutral",
+                    f"Not orbit {guess}",
+                    f"Hint from scan: go {hint}.",
+                    "🪐",
+                )
             _record_result("planet", outcome, detail)
 
     with col2:
         st.metric("Total attempts", st.session_state["planet_attempts"])
         _render_history("Planet Guess", "planet_history")
 
+
+def _game_number_guess():
+    _game_heading(
+        "🔢",
+        "Number Guess",
+        "You get 3 tries to find a number from 1 to 10.",
+        "Misses give you a higher/lower hint before the next try.",
+    )
+    col1, col2 = st.columns([1.05, 0.95], gap="large")
+
+    with col1:
+        st.caption(f"Tries left in current round: {st.session_state['guess_tries_left']}")
+        guess = st.slider("Your guess", 1, 10, 5)
+
+        if st.button("Submit guess", key="guess-play"):
+            st.session_state["guess_attempts"] += 1
+            target = st.session_state["guess_target"]
+
+            if guess == target:
+                used = 4 - st.session_state["guess_tries_left"]
+                detail = f"Guessed {guess} correctly in {used} attempt{'s' if used != 1 else ''}"
+                _record_result("guess", "win", detail)
+                _result_banner("win", "Correct guess", f"It was {target}. Solved in {used} attempt{'s' if used != 1 else ''}.", "🔢")
+                st.balloons()
+                st.session_state["guess_target"] = rd.randint(1, 10)
+                st.session_state["guess_tries_left"] = 3
+            else:
+                st.session_state["guess_tries_left"] -= 1
+                if st.session_state["guess_tries_left"] <= 0:
+                    detail = f"Missed 3 tries, target was {target}"
+                    _record_result("guess", "loss", detail)
+                    _result_banner("loss", "Out of tries", f"The number was {target}. Fresh round loaded.", "🔢")
+                    st.session_state["guess_target"] = rd.randint(1, 10)
+                    st.session_state["guess_tries_left"] = 3
+                else:
+                    hint = "higher" if target > guess else "lower"
+                    _result_banner(
+                        "neutral",
+                        "Keep scanning",
+                        f"Try {hint}. Tries left: {st.session_state['guess_tries_left']}.",
+                        "🔢",
+                    )
+
+        if st.button("Reset number round", key="guess-reset"):
+            st.session_state["guess_target"] = rd.randint(1, 10)
+            st.session_state["guess_tries_left"] = 3
+            _result_banner("neutral", "Round reset", "Started a fresh number puzzle.", "🔢")
+
+    with col2:
+        st.metric("Total attempts", st.session_state["guess_attempts"])
+        st.metric("Tries left", st.session_state["guess_tries_left"])
+        _render_history("Number Guess", "guess_history")
+
+
 def _quick_command_panel():
     st.markdown("---")
-    st.header("Quick Command")
+    st.subheader("Quick Command")
+    st.markdown(
+        '<p class="quick-hint">Use a shortcut button or type a command. Best for fast, low-friction control.</p>',
+        unsafe_allow_html=True,
+    )
+    short1, short2, short3 = st.columns(3, gap="small")
+    if short1.button("Help", key="quick-help", use_container_width=True):
+        st.info("Try: help, stats, reset")
+    if short2.button("Stats", key="quick-stats", use_container_width=True):
+        st.markdown(
+            f"**Total plays:** {st.session_state['stats_total']}  \n"
+            f"**Wins:** {_total_wins()}  \n"
+            f"**Luck index:** {_luck_index()}"
+        )
+    if short3.button("Reset", key="quick-reset", use_container_width=True):
+        _reset_state()
+        st.success("Session reset. Saved totals are still available.")
+
     with st.form("quick-command-form", clear_on_submit=True):
-        raw = st.text_input("Type a command", key="quick_cmd", placeholder="help, stats, reset")
+        raw = st.text_input("Type a command", placeholder="help, stats, reset")
         submitted = st.form_submit_button("Run command", use_container_width=True)
 
     if not submitted:
@@ -771,28 +888,26 @@ def _quick_command_panel():
             f"**Wins:** {_total_wins()}  \n"
             f"**Luck index:** {_luck_index()}"
         )
-    elif action in ("quit", "menu"):
-        st.warning(f"'{text}' is not used in Streamlit. Use the game picker in the sidebar.")
+    elif action in ("menu", "quit"):
+        st.warning(f"'{text}' is not used in Streamlit. Use the game picker above.")
     else:
-        st.error(f"Unknown command: '{text}'. Try 'help' for options.")
+        st.error(f"Unknown command: '{text}'. Try 'help'.")
 
 
-def _sidebar():
+def _sidebar() -> str:
     with st.sidebar:
         st.header("Game Menu")
-        game = st.radio(
-            "Pick a challenge",
-            list(GAMES.keys()),
-            index=0,
-        )
+        game = st.radio("Pick a challenge", list(GAMES.keys()), index=0, label_visibility="collapsed")
         st.caption(
-            f"Rounds {st.session_state['stats_total']} | Wins {_total_wins()} | Luck {_luck_index()}"
+            f"Rounds {st.session_state['stats_total']} | "
+            f"Wins {_total_wins()} | Win rate {_luck_index()}"
         )
+
         st.markdown("---")
         st.header("Session Controls")
         st.button("Reset session", on_click=_reset_state, use_container_width=True)
         st.markdown(
-            '<p class="sidebar-note">Clears local attempts and history. Saved totals remain available.</p>',
+            '<p class="sidebar-note">Clears local attempts and round history while preserving saved totals.</p>',
             unsafe_allow_html=True,
         )
 
@@ -800,46 +915,59 @@ def _sidebar():
 
     return game
 
-def main():
-    _apply_theming()
-    _init_state()
-    game = _sidebar()
-    _header()
-    _stats_bar()
-    st.markdown('<div class="section-break"></div>', unsafe_allow_html=True)
 
-    if game == "Dice Roll":
-        _game_dice()
-    elif game == "Coin Flip":
-        _game_coin()
-    elif game == "Meteor Dodge":
-        _game_meteor()
-    elif game == "Planet Guess":
-        _game_planet()
-    elif game == "Rock Paper Scissors":
-        _game_rps()
-    elif game == "Number Guess":
-        _game_number_guess()
-
-
-    st.markdown('<div class="section-break"></div>', unsafe_allow_html=True)
+def _render_rulebook():
     st.markdown(
         """
         <div class="rulebook">
-            <strong>Rulebook:</strong>
-            Dice Roll: win if your number matches the roll.
-            Coin Flip: win if the coin matches your call.
-            Rock Paper Scissors: ties are neutral and not logged as wins/losses.
-            Meteor Dodge: win if your lane is different from the meteor lane.
-            Planet Guess: win only on an exact orbit match.
-            Number Guess: win if you find the number in 3 tries.
+            <p class="rulebook-title">Starboard Rules</p>
+            <p class="rulebook-copy">
+                Every mission logs to your stats and flight log.
+                Keep this nearby when switching sectors.
+            </p>
+            <ul class="rulebook-list">
+                <li>Dice Roll: win if your number matches the roll.</li>
+                <li>Coin Flip: win if the coin matches your call.</li>
+                <li>Rock Paper Scissors: ties are neutral and not logged as wins/losses.</li>
+                <li>Meteor Dodge: win if your lane is different from the meteor lane.</li>
+                <li>Planet Guess: win only on an exact orbit match.</li>
+                <li>Number Guess: win by finding the number in 3 tries.</li>
+            </ul>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
+def main():
+    _apply_theming()
+    _init_state()
+    game = _sidebar()
+    _header(game)
+    _stats_bar()
+    st.markdown('<div class="section-break"></div>', unsafe_allow_html=True)
+    _mission_brief(game)
+
+    if game == "Dice Roll":
+        _game_dice()
+    elif game == "Coin Flip":
+        _game_coin()
+    elif game == "Rock Paper Scissors":
+        _game_rps()
+    elif game == "Meteor Dodge":
+        _game_meteor()
+    elif game == "Planet Guess":
+        _game_planet()
+    else:
+        _game_number_guess()
+
+    st.markdown('<div class="section-break"></div>', unsafe_allow_html=True)
+    col1, col2 = st.columns([1.08, 0.92], gap="large")
+    with col1:
+        _activity_feed_panel()
+    with col2:
+        _render_rulebook()
+
+
 if __name__ == "__main__":
     main()
-
-# 
