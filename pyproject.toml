@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "luck-arcade"
 version = "0.1.0"
-description = "Small arcade project with CLI + Streamlit mini-games."
+description = "Small arcade project with CLI + Flask mini-games."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ui = ["streamlit>=1.30.0"]
+ui = ["flask>=3.0.0"]
 
 [project.scripts]
 luck-arcade = "main:run_cli"

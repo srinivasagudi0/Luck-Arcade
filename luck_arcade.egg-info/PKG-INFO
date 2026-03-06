@@ -1,7 +1,7 @@
 Metadata-Version: 2.4
 Name: luck-arcade
 Version: 0.1.0
-Summary: Small arcade project with CLI + Streamlit mini-games.
+Summary: Small arcade project with CLI + Flask mini-games.
 Author: Srinivas Agudi
 License: MIT License
         
@@ -31,12 +31,12 @@ Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: python-docx>=1.1.0
 Provides-Extra: ui
-Requires-Dist: streamlit>=1.30.0; extra == "ui"
+Requires-Dist: flask>=3.0.0; extra == "ui"
 Dynamic: license-file
 
 # Luck Arcade
 
-Small arcade project with a CLI and a Streamlit UI.
+Small arcade project with a CLI and a Flask UI.
 It has Dice Roll, Coin Flip, Rock Paper Scissors, plus two space mini-games.
 
 ## Requirements
@@ -49,11 +49,11 @@ It has Dice Roll, Coin Flip, Rock Paper Scissors, plus two space mini-games.
 - Meteor Dodge (UI): choose a lane and avoid a meteor.
 - Planet Guess (UI): guess the orbit from 1 to 8.
 
-## Run (Streamlit UI)
+## Run (Flask UI)
 ```bash
 pip install -r requirements.txt
 # or: pip install -e .[ui]
-streamlit run app.py
+python3 app.py
 ```
 
 ## Run (CLI)
@@ -74,7 +74,7 @@ luck-arcade
 - Invalid input is handled with simple retry prompts.
 
 ## Files
-- `app.py`: Streamlit UI for all games.
+- `app.py`: Flask UI for all games.
 - `main.py`: CLI menu and game selection.
 - `dice_roll.py`, `coin_flip.py`, `rock_paper_scissors.py`: game logic.
 - `app.py` includes space-themed UI styling and extra UI-only games.

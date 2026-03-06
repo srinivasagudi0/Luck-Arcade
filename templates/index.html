@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Luck Arcade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar panel">
+      <div>
+        <h2>Game Menu</h2>
+        <p class="sidebar-copy">Rounds {{ stats.stats_total }} | Wins {{ total_wins }} | Win rate {{ luck_index }}</p>
+      </div>
+
+      <nav class="game-nav">
+        {% for card in game_cards %}
+        <a class="selector-card{% if card.active %} active{% endif %}" href="{{ url_for('index', game=card.label) }}">
+          <div class="selector-row">
+            <p class="selector-title">{{ card.icon }} {{ card.label }}</p>
+            <span class="selector-rate">Win {{ card.rate }}</span>
+          </div>
+          <p class="selector-sub">{{ card.subtitle }}</p>
+        </a>
+        {% endfor %}
+      </nav>
+
+      <div class="sidebar-section">
+        <h3>Session Controls</h3>
+        <form method="post" action="{{ url_for('action') }}">
+          <input type="hidden" name="game" value="{{ active_game }}">
+          <input type="hidden" name="ui_action" value="reset_session">
+          <button class="button button-secondary full" type="submit">Reset session</button>
+        </form>
+        <p class="sidebar-note">Clears local attempts and round history while preserving saved totals.</p>
+      </div>
+
+      <div class="sidebar-section quick-panel">
+        <h3>Quick Command</h3>
+        <p class="sidebar-copy">Use a shortcut button or type a command. Try `help`, `stats`, or `reset`.</p>
+        <div class="quick-grid">
+          <form method="post" action="{{ url_for('action') }}">
+            <input type="hidden" name="game" value="{{ active_game }}">
+            <input type="hidden" name="ui_action" value="quick_command">
+            <input type="hidden" name="command" value="help">
+            <button class="button full" type="submit">Help</button>
+          </form>
+          <form method="post" action="{{ url_for('action') }}">
+            <input type="hidden" name="game" value="{{ active_game }}">
+            <input type="hidden" name="ui_action" value="quick_command">
+            <input type="hidden" name="command" value="stats">
+            <button class="button full" type="submit">Stats</button>
+          </form>
+          <form method="post" action="{{ url_for('action') }}">
+            <input type="hidden" name="game" value="{{ active_game }}">
+            <input type="hidden" name="ui_action" value="quick_command">
+            <input type="hidden" name="command" value="reset">
+            <button class="button button-secondary full" type="submit">Reset</button>
+          </form>
+        </div>
+        <form class="command-form" method="post" action="{{ url_for('action') }}">
+          <input type="hidden" name="game" value="{{ active_game }}">
+          <input type="hidden" name="ui_action" value="quick_command">
+          <input type="text" name="command" placeholder="help, stats, reset">
+          <button class="button full" type="submit">Run command</button>
+        </form>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <section class="hero panel">
+        <p class="hero-kicker">Luck Arcade</p>
+        <h1 class="hero-title">Arcade Hub</h1>
+        <p class="hero-copy">Quick mini-games with instant results. Active game: <strong>{{ active_meta.icon }} {{ active_game }}</strong> - {{ active_meta.subtitle }}</p>
+        <div class="hero-row">
+          <span class="hero-chip">Rounds: {{ stats.stats_total }}</span>
+          <span class="hero-chip">Wins: {{ total_wins }}</span>
+          <span class="hero-chip">Win rate: {{ luck_index }}</span>
+          <span class="hero-chip">Games: {{ game_cards|length }}</span>
+          <span class="hero-chip">{{ best_game_summary }}</span>
+        </div>
+      </section>
+
+      <section class="stats-grid">
+        {% for label, value, subtext in stat_cards %}
+        <article class="metric-card">
+          <p class="metric-label">{{ label }}</p>
+          <p class="metric-value">{{ value }}</p>
+          <p class="metric-subtext">{{ subtext }}</p>
+        </article>
+        {% endfor %}
+      </section>
+
+      <div class="two-col section-gap">
+        <section class="brief-card panel">
+          <p class="brief-kicker">How to play</p>
+          <p class="brief-title">{{ active_meta.icon }} {{ active_game }}</p>
+          <ol class="brief-list">
+            {% for step in playbook %}
+            <li>{{ step }}</li>
+            {% endfor %}
+          </ol>
+        </section>
+
+        <section class="panel info-panel">
+          <h3>Mission Notes</h3>
+          <p class="sidebar-copy">Every completed round updates saved totals in `stats.json`. Browser-only history and attempts live in the Flask session.</p>
+        </section>
+      </div>
+
+      <section class="panel game-panel">
+        <div class="game-heading">
+          <div class="game-icon">{{ active_meta.icon }}</div>
+          <div>
+            <h2 class="game-title">{{ active_game }}</h2>
+            <p class="game-subtitle">{{ active_meta.subtitle }}</p>
+          </div>
+        </div>
+
+        {% if flash %}
+        <div class="result-banner result-{{ flash.kind }}">
+          <p class="result-top">{{ flash.icon }} {{ flash.title }}</p>
+          <p class="result-text">{{ flash.detail }}</p>
+        </div>
+        {% endif %}
+
+        <div class="two-col game-layout">
+          <section>
+            {% if active_key == 'dice' %}
+            <p class="game-tip">One tap, one roll. Clean and quick.</p>
+            <form class="game-form" method="post" action="{{ url_for('action') }}">
+              <input type="hidden" name="game" value="{{ active_game }}">
+              <label for="prediction">Your prediction</label>
+              <input id="prediction" name="prediction" type="range" min="1" max="6" value="3" oninput="this.nextElementSibling.value = this.value">
+              <output>3</output>
+              <button class="button" type="submit">Roll the die</button>
+            </form>
+            {% elif active_key == 'coin' %}
+            <p class="game-tip">Short rounds with instant result tracking.</p>
+            <form class="game-form" method="post" action="{{ url_for('action') }}">
+              <input type="hidden" name="game" value="{{ active_game }}">
+              <label>Your call</label>
+              <div class="segmented">
+                <label><input type="radio" name="choice" value="Heads" checked><span>Heads</span></label>
+                <label><input type="radio" name="choice" value="Tails"><span>Tails</span></label>
+              </div>
+              <button class="button" type="submit">Flip coin</button>
+            </form>
+            {% elif active_key == 'rps' %}
+            <p class="game-tip">Ties are neutral and do not affect win/loss stats.</p>
+            <form class="game-form" method="post" action="{{ url_for('action') }}">
+              <input type="hidden" name="game" value="{{ active_game }}">
+              <label>Your choice</label>
+              <div class="segmented triple">
+                <label><input type="radio" name="user_choice" value="Rock" checked><span>Rock</span></label>
+                <label><input type="radio" name="user_choice" value="Paper"><span>Paper</span></label>
+                <label><input type="radio" name="user_choice" value="Scissors"><span>Scissors</span></label>
+              </div>
+              <button class="button" type="submit">Play</button>
+            </form>
+            {% elif active_key == 'meteor' %}
+            <p class="game-tip">If the meteor lands in your lane, it is a loss.</p>
+            <form class="game-form" method="post" action="{{ url_for('action') }}">
+              <input type="hidden" name="game" value="{{ active_game }}">
+              <label>Your lane</label>
+              <div class="segmented triple">
+                <label><input type="radio" name="lane" value="Left"><span>Left</span></label>
+                <label><input type="radio" name="lane" value="Center" checked><span>Center</span></label>
+                <label><input type="radio" name="lane" value="Right"><span>Right</span></label>
+              </div>
+              <button class="button" type="submit">Engage thrusters</button>
+            </form>
+            {% elif active_key == 'planet' %}
+            <p class="game-tip">Exact match wins. You get a higher/lower hint on misses.</p>
+            <form class="game-form" method="post" action="{{ url_for('action') }}">
+              <input type="hidden" name="game" value="{{ active_game }}">
+              <label for="planet-guess">Your scan orbit</label>
+              <input id="planet-guess" name="guess" type="range" min="1" max="8" value="4" oninput="this.nextElementSibling.value = this.value">
+              <output>4</output>
+              <button class="button" type="submit">Ping the planet</button>
+            </form>
+            {% else %}
+            <p class="game-tip">Misses give you a higher/lower hint before the next try.</p>
+            <form class="game-form" method="post" action="{{ url_for('action') }}">
+              <input type="hidden" name="game" value="{{ active_game }}">
+              <p class="sidebar-copy">Tries left in current round: {{ guess_tries_left }}</p>
+              <label for="number-guess">Your guess</label>
+              <input id="number-guess" name="guess" type="range" min="1" max="10" value="5" oninput="this.nextElementSibling.value = this.value">
+              <output>5</output>
+              <button class="button" type="submit">Submit guess</button>
+            </form>
+            <form method="post" action="{{ url_for('action') }}">
+              <input type="hidden" name="game" value="{{ active_game }}">
+              <input type="hidden" name="action" value="reset_round">
+              <button class="button button-secondary" type="submit">Reset number round</button>
+            </form>
+            {% endif %}
+          </section>
+
+          <section class="side-metrics">
+            <article class="metric-card accent">
+              <p class="metric-label">Total attempts</p>
+              <p class="metric-value">{{ attempts[active_key] }}</p>
+            </article>
+            {% if active_key == 'guess' %}
+            <article class="metric-card accent">
+              <p class="metric-label">Tries left</p>
+              <p class="metric-value">{{ guess_tries_left }}</p>
+            </article>
+            {% endif %}
+
+            <article class="history-card">
+              <p class="history-title">Recent Rounds: {{ active_game }}</p>
+              {% if history %}
+              <ul>
+                {% for item in history %}
+                <li>{{ item }}</li>
+                {% endfor %}
+              </ul>
+              {% else %}
+              <p class="history-empty">No rounds yet. Play once and this fills up.</p>
+              {% endif %}
+            </article>
+          </section>
+        </div>
+      </section>
+
+      <div class="two-col section-gap">
+        <section class="feed-card panel">
+          <p class="feed-title">Flight Log</p>
+          {% if activity_feed %}
+            {% for item in activity_feed %}
+            <div class="feed-item">{{ item }}</div>
+            {% endfor %}
+          {% else %}
+            <p class="history-empty">No rounds recorded yet. Play any sector to start the log.</p>
+          {% endif %}
+        </section>
+
+        <section class="rulebook panel">
+          <p class="rulebook-title">Starboard Rules</p>
+          <p class="rulebook-copy">Every mission logs to your stats and flight log. Keep this nearby when switching sectors.</p>
+          <ul class="rulebook-list">
+            {% for item in rulebook %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

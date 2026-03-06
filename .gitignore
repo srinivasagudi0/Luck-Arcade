@@ -28,3 +28,6 @@ Thumbs.db
 coverage.xml
 .coverage
 
+
+# Local app data
+stats.json

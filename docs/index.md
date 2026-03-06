@@ -1,21 +1,30 @@
 # Luck Arcade
 
-Simple project with mini-games in two modes:
-
+Modes:
 - CLI mode (`main.py`)
-- Streamlit mode (`app.py`)
+- Flask mode (`app.py`)
 
-## Quick Start
+Games:
+- Dice Roll
+- Coin Flip
+- Rock Paper Scissors
+- Meteor Dodge
+- Planet Guess
+- Number Guess
+
+Stats persist in `stats.json`.
+
+## Run the UI
 
 ```bash
 pip install -r requirements.txt
-python3 main.py
+python3 app.py
 ```
 
-or
+Open `http://127.0.0.1:8000`.
+
+## Run the CLI
 
 ```bash
-streamlit run app.py
+python3 main.py
 ```
-
-This page exists so GitHub Pages can build from the `docs/` folder.
